@@ -1,6 +1,6 @@
 /**
  * at.js - 1.5.4
- * Copyright (c) 2017 chord.luo <chord.luo@gmail.com>;
+ * Copyright (c) 2018 chord.luo <chord.luo@gmail.com>;
  * Homepage: http://ichord.github.com/At.js
  * License: MIT
  */
@@ -208,6 +208,7 @@ App = (function() {
         var ref;
         if ((ref = _this.controller()) != null) {
           ref.view.hide();
+          ref.placeholderView.hide();
         }
         _this.isComposing = true;
         return null;
@@ -233,6 +234,7 @@ App = (function() {
         var c;
         if (c = _this.controller()) {
           c.expectedQueryCBId = null;
+          c.placeholderView.hide();
           return c.view.hide(e, c.getOpt("displayTimeout"));
         }
       };
@@ -249,6 +251,7 @@ App = (function() {
           currentScrollTop = e.target.scrollTop;
           if (lastScrollTop !== currentScrollTop) {
             if ((ref = _this.controller()) != null) {
+              ref.placeholderView.hide();
               ref.view.hide(e);
             }
           }
@@ -273,6 +276,9 @@ App = (function() {
 
   App.prototype.dispatch = function(e) {
     var _, c, ref, results;
+    if (void 0 === e) {
+      return;
+    }
     ref = this.controllers;
     results = [];
     for (_ in ref) {
@@ -288,6 +294,7 @@ App = (function() {
       case KEY_CODE.ESC:
         e.preventDefault();
         if ((ref = this.controller()) != null) {
+          ref.placeholderView.hide();
           ref.view.hide();
         }
         break;
@@ -392,6 +399,7 @@ Controller = (function() {
     }
     this.model = new Model(this);
     this.view = new View(this);
+    this.placeholderView = new PlaceholderView(this);
   }
 
   Controller.prototype.init = function(setting) {
@@ -404,6 +412,7 @@ Controller = (function() {
     this.trigger('beforeDestroy');
     this.model.destroy();
     this.view.destroy();
+    this.placeholderView.destroy();
     return this.$el.remove();
   };
 
@@ -457,6 +466,10 @@ Controller = (function() {
     searchKey = this.getOpt("searchKey");
     data = this.callbacks("sorter").call(this, this.query.text, data.slice(0, 1001), searchKey);
     return this.view.render(data.slice(0, this.getOpt('limit')));
+  };
+
+  Controller.prototype.renderPlaceholder = function(query) {
+    return this.placeholderView.render(query);
   };
 
   Controller.arrayToDefaultHash = function(data) {
@@ -542,8 +555,13 @@ Controller = (function() {
         return;
       }
       if (data && data.length > 0) {
+        this.placeholderView.hide();
         return this.renderView(this.constructor.arrayToDefaultHash(data));
       } else {
+        if (!query || query.text.length == 0 || query.text.length > this.getOpt('queryMinLength')) {
+
+        }
+        this.renderPlaceholder(query.text);
         return this.view.hide();
       }
     };
@@ -590,6 +608,7 @@ TextareaController = (function(superClass) {
       this.trigger("matched", [this.at, query.text]);
     } else {
       query = null;
+      this.placeholderView.hide();
       this.view.hide();
     }
     return this.query = query;
@@ -791,6 +810,7 @@ EditableController = (function(superClass) {
       this.trigger("matched", [this.at, query.text]);
       return this.query = query;
     } else {
+      this.placeholderView.hide();
       this.view.hide();
       this.query = {
         el: $query
@@ -1116,6 +1136,80 @@ View = (function() {
   };
 
   return View;
+
+})();
+
+var PlaceholderView;
+
+PlaceholderView = (function() {
+  function PlaceholderView(context) {
+    this.context = context;
+    this.$el = $("<div class='atwho-placeholder'><div class='atwho-placeholder-content'></div></div>");
+    this.$elContent = this.$el.find('.atwho-placeholder-content');
+    this.context.$el.append(this.$el);
+  }
+
+  PlaceholderView.prototype.destroy = function() {
+    return this.$el.remove();
+  };
+
+  PlaceholderView.prototype.visible = function() {
+    return $.expr.filters.visible(this.$el[0]);
+  };
+
+  PlaceholderView.prototype.reposition = function(rect) {
+    var _window, offset, overflowOffset, ref;
+    _window = this.context.app.iframeAsRoot ? this.context.app.window : window;
+    if (rect.bottom + this.$el.height() - $(_window).scrollTop() > $(_window).height()) {
+      rect.bottom = rect.top - this.$el.height();
+    }
+    if (rect.left > (overflowOffset = $(_window).width() - this.$el.width() - 5)) {
+      rect.left = overflowOffset;
+    }
+    offset = {
+      left: rect.left,
+      top: rect.bottom
+    };
+    if ((ref = this.context.callbacks("beforeRepositionPlaceholder")) != null) {
+      ref.call(this.context, offset);
+    }
+    this.$el.offset(offset);
+    return this.context.trigger("repositionPlaceholder", [offset]);
+  };
+
+  PlaceholderView.prototype.show = function() {
+    var rect;
+    if (!this.visible()) {
+      this.$el.show();
+    }
+    if (rect = this.context.rect()) {
+      return this.reposition(rect);
+    }
+  };
+
+  PlaceholderView.prototype.hide = function(e, time) {
+    var callback;
+    if (!this.visible()) {
+      return;
+    }
+    this.$el.hide();
+  };
+
+  PlaceholderView.prototype.render = function(query) {
+    var msg, queryMinLength = this.context.getOpt('queryMinLength');
+    if (query && query.length > queryMinLength) {
+      msg = 'No matches found';
+    } else {
+      msg = 'Type to lookup a document by its ID, title or type';
+      if (queryMinLength > 0) {
+        msg += ' (min. ' + queryMinLength + ' character' + (queryMinLength > 1 ? 's' : '') + ')';
+      }
+    }
+    this.$elContent.text(msg)
+    this.show();
+  };
+
+  return PlaceholderView;
 
 })();
 

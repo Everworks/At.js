@@ -1200,7 +1200,7 @@ PlaceholderView = (function() {
     if (query && query.length > queryMinLength) {
       msg = 'No matches found';
     } else {
-      msg = 'Type to lookup a document by its ID, title or type';
+      msg = 'Type to lookup a record by its ID, title or type';
       if (queryMinLength > 0) {
         msg += ' (min. ' + queryMinLength + ' character' + (queryMinLength > 1 ? 's' : '') + ')';
       }
